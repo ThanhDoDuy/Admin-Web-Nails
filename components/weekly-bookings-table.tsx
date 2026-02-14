@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Pencil, Trash2 } from 'lucide-react'
 import type { Booking } from '@/lib/api-client'
 import { format, parseISO } from 'date-fns'
 
@@ -12,6 +13,8 @@ interface WeeklyBookingsTableProps {
   selectedDay: string | null
   isLoading: boolean
   onStatusUpdate: (bookingId: string, status: 'confirmed' | 'cancelled') => void
+  onEdit?: (booking: Booking) => void
+  onDelete?: (booking: Booking) => void
 }
 
 function getStatusColor(status: string) {
@@ -30,6 +33,8 @@ export function WeeklyBookingsTable({
   selectedDay,
   isLoading,
   onStatusUpdate,
+  onEdit,
+  onDelete,
 }: WeeklyBookingsTableProps) {
   // Filter by selected day, then sort by date + time
   const filtered = useMemo(() => {
@@ -107,7 +112,7 @@ export function WeeklyBookingsTable({
                       </Badge>
                     </td>
                     <td className="py-3 px-4 text-right">
-                      <div className="flex gap-2 justify-end">
+                      <div className="flex gap-1 justify-end">
                         {booking.status !== 'confirmed' && (
                           <Button
                             size="sm"
@@ -125,6 +130,26 @@ export function WeeklyBookingsTable({
                             className="text-xs border-border text-muted-foreground hover:text-red-500 hover:border-red-200"
                           >
                             Cancel
+                          </Button>
+                        )}
+                        {onEdit && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onEdit(booking)}
+                            className="text-xs text-muted-foreground hover:text-foreground"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        {onDelete && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onDelete(booking)}
+                            className="text-xs text-muted-foreground hover:text-red-600"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
                           </Button>
                         )}
                       </div>

@@ -19,8 +19,12 @@ import { MonthCalendar } from '@/components/month-calendar'
 import { MonthlyBookingsTable } from '@/components/monthly-bookings-table'
 import { getCurrentMonthRange, type MonthRange } from '@/lib/month-helpers'
 
-import { apiClient, type Booking, type ErrorResponse } from '@/lib/api-client'
-import { AlertCircle, CalendarDays, CheckCircle, Clock } from 'lucide-react'
+// Dialogs
+import { BookingFormDialog } from '@/components/booking-form-dialog'
+import { DeleteBookingDialog } from '@/components/delete-booking-dialog'
+
+import { apiClient, type Booking, type CreateBookingData, type ErrorResponse } from '@/lib/api-client'
+import { AlertCircle, CalendarDays, CheckCircle, Clock, Plus } from 'lucide-react'
 
 type ViewMode = 'weekly' | 'monthly'
 
@@ -40,6 +44,12 @@ export default function DashboardPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ErrorResponse | null>(null)
+
+  // ── Dialog states ─────────────────────────────────────────
+  const [formDialogOpen, setFormDialogOpen] = useState(false)
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null)
 
   // ── Fetch: weekly ─────────────────────────────────────────
   const fetchWeeklyBookings = useCallback(async (range: WeekRange) => {
@@ -69,14 +79,19 @@ export default function DashboardPage() {
     }
   }, [])
 
-  // ── Effect: fetch on range or view change ─────────────────
-  useEffect(() => {
+  // ── Refetch current view ──────────────────────────────────
+  const refetchBookings = useCallback(() => {
     if (viewMode === 'weekly') {
       fetchWeeklyBookings(weekRange)
     } else {
       fetchMonthlyBookings(monthRange)
     }
   }, [viewMode, weekRange, monthRange, fetchWeeklyBookings, fetchMonthlyBookings])
+
+  // ── Effect: fetch on range or view change ─────────────────
+  useEffect(() => {
+    refetchBookings()
+  }, [refetchBookings])
 
   // ── Handlers ──────────────────────────────────────────────
   const handleViewChange = (mode: ViewMode) => {
@@ -106,6 +121,43 @@ export default function DashboardPage() {
     }
   }
 
+  // ── Create booking ──────────────────────────────────────
+  const handleCreateBooking = async (data: CreateBookingData) => {
+    await apiClient.createBooking(data)
+    // Re-fetch so the new booking appears in the correct date view
+    refetchBookings()
+  }
+
+  // ── Edit booking ────────────────────────────────────────
+  const handleEditBooking = async (data: CreateBookingData) => {
+    if (!editingBooking) return
+    const updated = await apiClient.updateBooking(editingBooking._id, data)
+    setBookings((prev) =>
+      prev.map((b) => (b._id === updated._id ? updated : b))
+    )
+  }
+
+  const openCreateDialog = () => {
+    setEditingBooking(null)
+    setFormDialogOpen(true)
+  }
+
+  const openEditDialog = (booking: Booking) => {
+    setEditingBooking(booking)
+    setFormDialogOpen(true)
+  }
+
+  // ── Delete booking ──────────────────────────────────────
+  const handleDeleteBooking = async (bookingId: string) => {
+    await apiClient.deleteBooking(bookingId)
+    setBookings((prev) => prev.filter((b) => b._id !== bookingId))
+  }
+
+  const openDeleteDialog = (booking: Booking) => {
+    setDeletingBooking(booking)
+    setDeleteDialogOpen(true)
+  }
+
   // ── Derived stats ─────────────────────────────────────────
   const totalBookings = bookings.length
   const confirmedCount = bookings.filter((b) => b.status === 'confirmed').length
@@ -127,6 +179,16 @@ export default function DashboardPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* New Booking button */}
+              <Button
+                onClick={openCreateDialog}
+                size="sm"
+                className="bg-foreground hover:bg-foreground/85 text-white"
+              >
+                <Plus className="w-4 h-4 mr-1.5" />
+                New Booking
+              </Button>
+
               {/* View toggle */}
               <div className="flex rounded-lg border border-border overflow-hidden">
                 <button
@@ -232,6 +294,8 @@ export default function DashboardPage() {
                 selectedDay={weekSelectedDay}
                 isLoading={isLoading}
                 onStatusUpdate={handleStatusUpdate}
+                onEdit={openEditDialog}
+                onDelete={openDeleteDialog}
               />
             </>
           )}
@@ -252,10 +316,34 @@ export default function DashboardPage() {
                 selectedDay={monthSelectedDay}
                 isLoading={isLoading}
                 onStatusUpdate={handleStatusUpdate}
+                onEdit={openEditDialog}
+                onDelete={openDeleteDialog}
               />
             </>
           )}
         </div>
+
+        {/* Create / Edit Dialog */}
+        <BookingFormDialog
+          open={formDialogOpen}
+          onOpenChange={(open) => {
+            setFormDialogOpen(open)
+            if (!open) setEditingBooking(null)
+          }}
+          booking={editingBooking}
+          onSubmit={editingBooking ? handleEditBooking : handleCreateBooking}
+        />
+
+        {/* Delete Dialog */}
+        <DeleteBookingDialog
+          open={deleteDialogOpen}
+          onOpenChange={(open) => {
+            setDeleteDialogOpen(open)
+            if (!open) setDeletingBooking(null)
+          }}
+          booking={deletingBooking}
+          onConfirm={handleDeleteBooking}
+        />
       </DashboardLayout>
     </ProtectedRoute>
   )

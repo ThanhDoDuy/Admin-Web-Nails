@@ -31,6 +31,29 @@ export interface ChangePasswordResponse {
   message: string
 }
 
+export interface CreateBookingData {
+  serviceName: string
+  customerName: string
+  customerPhone: string
+  bookingDate: string
+  bookingTime: string
+  notes?: string
+}
+
+export interface UpdateBookingData {
+  serviceName?: string
+  customerName?: string
+  customerPhone?: string
+  bookingDate?: string
+  bookingTime?: string
+  notes?: string
+  status?: 'pending' | 'confirmed' | 'cancelled'
+}
+
+export interface DeleteResponse {
+  message: string
+}
+
 export interface ErrorResponse {
   message: string | string[]
   error: string
@@ -109,7 +132,7 @@ class ApiClient {
     return this.handleResponse<ChangePasswordResponse>(response)
   }
 
-  async createBooking(booking: Omit<Booking, '_id' | 'salonId' | 'createdAt' | 'updatedAt' | 'status'> & { salonId: string; notes?: string }): Promise<Booking> {
+  async createBooking(booking: CreateBookingData): Promise<Booking> {
     const response = await fetch(`${API_BASE}/bookings`, {
       method: 'POST',
       headers: this.getHeaders(),
@@ -165,6 +188,23 @@ class ApiClient {
       body: JSON.stringify({ status }),
     })
     return this.handleResponse<Booking>(response)
+  }
+
+  async updateBooking(bookingId: string, data: UpdateBookingData): Promise<Booking> {
+    const response = await fetch(`${API_BASE}/bookings/${bookingId}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+    return this.handleResponse<Booking>(response)
+  }
+
+  async deleteBooking(bookingId: string): Promise<DeleteResponse> {
+    const response = await fetch(`${API_BASE}/bookings/${bookingId}`, {
+      method: 'DELETE',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<DeleteResponse>(response)
   }
 }
 

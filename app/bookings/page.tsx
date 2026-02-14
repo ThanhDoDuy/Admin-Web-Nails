@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { apiClient, Booking, ErrorResponse } from '@/lib/api-client'
+import { BookingFormDialog } from '@/components/booking-form-dialog'
+import { DeleteBookingDialog } from '@/components/delete-booking-dialog'
+import { apiClient, type Booking, type CreateBookingData, type ErrorResponse } from '@/lib/api-client'
 import { format } from 'date-fns'
-import { Search, AlertCircle, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, AlertCircle, ChevronUp, ChevronDown, Plus, Pencil, Trash2 } from 'lucide-react'
 
 type SortField = 'date' | 'name' | 'status'
 type SortOrder = 'asc' | 'desc'
@@ -24,6 +26,12 @@ export default function BookingsPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
+
+  // Dialog states
+  const [formDialogOpen, setFormDialogOpen] = useState(false)
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null)
 
   useEffect(() => {
     fetchAllBookings()
@@ -96,6 +104,42 @@ export default function BookingsPage() {
     }
   }
 
+  // ── Create booking ──────────────────────────────────────
+  const handleCreateBooking = async (data: CreateBookingData) => {
+    const created = await apiClient.createBooking(data)
+    setBookings((prev) => [created, ...prev])
+  }
+
+  // ── Edit booking ────────────────────────────────────────
+  const handleEditBooking = async (data: CreateBookingData) => {
+    if (!editingBooking) return
+    const updated = await apiClient.updateBooking(editingBooking._id, data)
+    setBookings((prev) =>
+      prev.map((b) => (b._id === updated._id ? updated : b))
+    )
+  }
+
+  const openEditDialog = (booking: Booking) => {
+    setEditingBooking(booking)
+    setFormDialogOpen(true)
+  }
+
+  const openCreateDialog = () => {
+    setEditingBooking(null)
+    setFormDialogOpen(true)
+  }
+
+  // ── Delete booking ──────────────────────────────────────
+  const handleDeleteBooking = async (bookingId: string) => {
+    await apiClient.deleteBooking(bookingId)
+    setBookings((prev) => prev.filter((b) => b._id !== bookingId))
+  }
+
+  const openDeleteDialog = (booking: Booking) => {
+    setDeletingBooking(booking)
+    setDeleteDialogOpen(true)
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -133,11 +177,20 @@ export default function BookingsPage() {
       <DashboardLayout>
         <div className="space-y-6">
           {/* Header */}
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">All Bookings</h1>
-            <p className="text-muted-foreground mt-1">
-              {filteredBookings.length} of {bookings.length} bookings
-            </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">All Bookings</h1>
+              <p className="text-muted-foreground mt-1">
+                {filteredBookings.length} of {bookings.length} bookings
+              </p>
+            </div>
+            <Button
+              onClick={openCreateDialog}
+              className="bg-foreground hover:bg-foreground/85 text-white"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              New Booking
+            </Button>
           </div>
 
           {/* Error Alert */}
@@ -250,7 +303,7 @@ export default function BookingsPage() {
                             </Badge>
                           </td>
                           <td className="py-3 px-4 text-right">
-                            <div className="flex gap-2 justify-end">
+                            <div className="flex gap-1 justify-end">
                               {booking.status !== 'confirmed' && (
                                 <Button
                                   size="sm"
@@ -270,6 +323,22 @@ export default function BookingsPage() {
                                   Cancel
                                 </Button>
                               )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openEditDialog(booking)}
+                                className="text-xs text-muted-foreground hover:text-foreground"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openDeleteDialog(booking)}
+                                className="text-xs text-muted-foreground hover:text-red-600"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
                             </div>
                           </td>
                         </tr>
@@ -281,6 +350,28 @@ export default function BookingsPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Create / Edit Dialog */}
+        <BookingFormDialog
+          open={formDialogOpen}
+          onOpenChange={(open) => {
+            setFormDialogOpen(open)
+            if (!open) setEditingBooking(null)
+          }}
+          booking={editingBooking}
+          onSubmit={editingBooking ? handleEditBooking : handleCreateBooking}
+        />
+
+        {/* Delete Dialog */}
+        <DeleteBookingDialog
+          open={deleteDialogOpen}
+          onOpenChange={(open) => {
+            setDeleteDialogOpen(open)
+            if (!open) setDeletingBooking(null)
+          }}
+          booking={deletingBooking}
+          onConfirm={handleDeleteBooking}
+        />
       </DashboardLayout>
     </ProtectedRoute>
   )
