@@ -10,9 +10,11 @@ import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { BookingFormDialog } from '@/components/booking-form-dialog'
 import { DeleteBookingDialog } from '@/components/delete-booking-dialog'
-import { apiClient, type Booking, type CreateBookingData, type ErrorResponse } from '@/lib/api-client'
+import { LoyaltyBadge } from '@/components/loyalty-badge'
+import { apiClient, type Booking, type Customer, type CreateBookingData, type ErrorResponse } from '@/lib/api-client'
 import { format } from 'date-fns'
-import { Search, AlertCircle, ChevronUp, ChevronDown, Plus, Pencil, Trash2 } from 'lucide-react'
+import { ViewBookingDialog } from '@/components/view-booking-dialog'
+import { Search, AlertCircle, ChevronUp, ChevronDown, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
 
 type SortField = 'date' | 'name' | 'status'
 type SortOrder = 'asc' | 'desc'
@@ -32,9 +34,15 @@ export default function BookingsPage() {
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null)
+  const [viewDialogOpen, setViewDialogOpen] = useState(false)
+  const [viewingBooking, setViewingBooking] = useState<Booking | null>(null)
+
+  // Customer loyalty data
+  const [customerMap, setCustomerMap] = useState<Map<string, Customer>>(new Map())
 
   useEffect(() => {
     fetchAllBookings()
+    fetchCustomers()
   }, [])
 
   useEffect(() => {
@@ -51,6 +59,19 @@ export default function BookingsPage() {
       setError(err as ErrorResponse)
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchCustomers = async () => {
+    try {
+      const customers = await apiClient.getCustomers()
+      const map = new Map<string, Customer>()
+      for (const c of customers) {
+        map.set(c.customerPhone, c)
+      }
+      setCustomerMap(map)
+    } catch {
+      // non-critical
     }
   }
 
@@ -138,6 +159,11 @@ export default function BookingsPage() {
   const openDeleteDialog = (booking: Booking) => {
     setDeletingBooking(booking)
     setDeleteDialogOpen(true)
+  }
+
+  const openViewDialog = (booking: Booking) => {
+    setViewingBooking(booking)
+    setViewDialogOpen(true)
   }
 
   const getStatusColor = (status: string) => {
@@ -291,7 +317,17 @@ export default function BookingsPage() {
                           key={booking._id}
                           className="border-b border-border/50 hover:bg-secondary/30 transition"
                         >
-                          <td className="py-3 px-4 text-foreground font-medium">{booking.customerName}</td>
+                          <td className="py-3 px-4 text-foreground font-medium">
+                            <div className="flex items-center gap-1.5">
+                              {booking.customerName}
+                              {customerMap.get(booking.customerPhone) && (
+                                <LoyaltyBadge
+                                  tier={customerMap.get(booking.customerPhone)!.loyaltyTier}
+                                  showIcon={false}
+                                />
+                              )}
+                            </div>
+                          </td>
                           <td className="py-3 px-4 text-muted-foreground">{booking.serviceName}</td>
                           <td className="py-3 px-4 text-muted-foreground">
                             {format(new Date(`${booking.bookingDate}T${booking.bookingTime}`), 'MMM dd, yyyy • HH:mm')}
@@ -323,6 +359,14 @@ export default function BookingsPage() {
                                   Cancel
                                 </Button>
                               )}
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => openViewDialog(booking)}
+                                className="text-xs text-muted-foreground hover:text-blue-600"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -371,6 +415,16 @@ export default function BookingsPage() {
           }}
           booking={deletingBooking}
           onConfirm={handleDeleteBooking}
+        />
+
+        {/* View Dialog */}
+        <ViewBookingDialog
+          open={viewDialogOpen}
+          onOpenChange={(open) => {
+            setViewDialogOpen(open)
+            if (!open) setViewingBooking(null)
+          }}
+          booking={viewingBooking}
         />
       </DashboardLayout>
     </ProtectedRoute>

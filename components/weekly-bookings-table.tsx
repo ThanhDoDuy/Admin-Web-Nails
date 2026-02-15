@@ -4,15 +4,18 @@ import { useMemo } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Pencil, Trash2 } from 'lucide-react'
-import type { Booking } from '@/lib/api-client'
+import { Eye, Pencil, Trash2 } from 'lucide-react'
+import { LoyaltyBadge } from '@/components/loyalty-badge'
+import type { Booking, Customer } from '@/lib/api-client'
 import { format, parseISO } from 'date-fns'
 
 interface WeeklyBookingsTableProps {
   bookings: Booking[]
   selectedDay: string | null
   isLoading: boolean
+  customerMap?: Map<string, Customer>
   onStatusUpdate: (bookingId: string, status: 'confirmed' | 'cancelled') => void
+  onView?: (booking: Booking) => void
   onEdit?: (booking: Booking) => void
   onDelete?: (booking: Booking) => void
 }
@@ -33,6 +36,8 @@ export function WeeklyBookingsTable({
   selectedDay,
   isLoading,
   onStatusUpdate,
+  customerMap,
+  onView,
   onEdit,
   onDelete,
 }: WeeklyBookingsTableProps) {
@@ -92,7 +97,15 @@ export function WeeklyBookingsTable({
                     className="border-b border-border/50 hover:bg-secondary/30 transition"
                   >
                     <td className="py-3 px-4 text-foreground font-medium">
-                      {booking.customerName}
+                      <div className="flex items-center gap-1.5">
+                        {booking.customerName}
+                        {customerMap?.get(booking.customerPhone) && (
+                          <LoyaltyBadge
+                            tier={customerMap.get(booking.customerPhone)!.loyaltyTier}
+                            showIcon={false}
+                          />
+                        )}
+                      </div>
                     </td>
                     <td className="py-3 px-4 text-muted-foreground">
                       {booking.serviceName}
@@ -130,6 +143,16 @@ export function WeeklyBookingsTable({
                             className="text-xs border-border text-muted-foreground hover:text-red-500 hover:border-red-200"
                           >
                             Cancel
+                          </Button>
+                        )}
+                        {onView && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => onView(booking)}
+                            className="text-xs text-muted-foreground hover:text-blue-600"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
                           </Button>
                         )}
                         {onEdit && (

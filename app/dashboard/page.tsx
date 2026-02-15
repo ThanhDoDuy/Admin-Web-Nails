@@ -22,8 +22,9 @@ import { getCurrentMonthRange, type MonthRange } from '@/lib/month-helpers'
 // Dialogs
 import { BookingFormDialog } from '@/components/booking-form-dialog'
 import { DeleteBookingDialog } from '@/components/delete-booking-dialog'
+import { ViewBookingDialog } from '@/components/view-booking-dialog'
 
-import { apiClient, type Booking, type CreateBookingData, type ErrorResponse } from '@/lib/api-client'
+import { apiClient, type Booking, type Customer, type CreateBookingData, type ErrorResponse } from '@/lib/api-client'
 import { AlertCircle, CalendarDays, CheckCircle, Clock, Plus } from 'lucide-react'
 
 type ViewMode = 'weekly' | 'monthly'
@@ -45,11 +46,16 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<ErrorResponse | null>(null)
 
+  // ── Customer loyalty data ───────────────────────────────────
+  const [customerMap, setCustomerMap] = useState<Map<string, Customer>>(new Map())
+
   // ── Dialog states ─────────────────────────────────────────
   const [formDialogOpen, setFormDialogOpen] = useState(false)
   const [editingBooking, setEditingBooking] = useState<Booking | null>(null)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [deletingBooking, setDeletingBooking] = useState<Booking | null>(null)
+  const [viewDialogOpen, setViewDialogOpen] = useState(false)
+  const [viewingBooking, setViewingBooking] = useState<Booking | null>(null)
 
   // ── Fetch: weekly ─────────────────────────────────────────
   const fetchWeeklyBookings = useCallback(async (range: WeekRange) => {
@@ -79,6 +85,20 @@ export default function DashboardPage() {
     }
   }, [])
 
+  // ── Fetch: customers (for loyalty badges) ────────────────
+  const fetchCustomers = useCallback(async () => {
+    try {
+      const customers = await apiClient.getCustomers()
+      const map = new Map<string, Customer>()
+      for (const c of customers) {
+        map.set(c.customerPhone, c)
+      }
+      setCustomerMap(map)
+    } catch {
+      // non-critical, badges just won't show
+    }
+  }, [])
+
   // ── Refetch current view ──────────────────────────────────
   const refetchBookings = useCallback(() => {
     if (viewMode === 'weekly') {
@@ -91,7 +111,8 @@ export default function DashboardPage() {
   // ── Effect: fetch on range or view change ─────────────────
   useEffect(() => {
     refetchBookings()
-  }, [refetchBookings])
+    fetchCustomers()
+  }, [refetchBookings, fetchCustomers])
 
   // ── Handlers ──────────────────────────────────────────────
   const handleViewChange = (mode: ViewMode) => {
@@ -156,6 +177,11 @@ export default function DashboardPage() {
   const openDeleteDialog = (booking: Booking) => {
     setDeletingBooking(booking)
     setDeleteDialogOpen(true)
+  }
+
+  const openViewDialog = (booking: Booking) => {
+    setViewingBooking(booking)
+    setViewDialogOpen(true)
   }
 
   // ── Derived stats ─────────────────────────────────────────
@@ -293,7 +319,9 @@ export default function DashboardPage() {
                 bookings={bookings}
                 selectedDay={weekSelectedDay}
                 isLoading={isLoading}
+                customerMap={customerMap}
                 onStatusUpdate={handleStatusUpdate}
+                onView={openViewDialog}
                 onEdit={openEditDialog}
                 onDelete={openDeleteDialog}
               />
@@ -315,7 +343,9 @@ export default function DashboardPage() {
                 bookings={bookings}
                 selectedDay={monthSelectedDay}
                 isLoading={isLoading}
+                customerMap={customerMap}
                 onStatusUpdate={handleStatusUpdate}
+                onView={openViewDialog}
                 onEdit={openEditDialog}
                 onDelete={openDeleteDialog}
               />
@@ -343,6 +373,16 @@ export default function DashboardPage() {
           }}
           booking={deletingBooking}
           onConfirm={handleDeleteBooking}
+        />
+
+        {/* View Dialog */}
+        <ViewBookingDialog
+          open={viewDialogOpen}
+          onOpenChange={(open) => {
+            setViewDialogOpen(open)
+            if (!open) setViewingBooking(null)
+          }}
+          booking={viewingBooking}
         />
       </DashboardLayout>
     </ProtectedRoute>

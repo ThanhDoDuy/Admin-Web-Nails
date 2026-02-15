@@ -54,6 +54,34 @@ export interface DeleteResponse {
   message: string
 }
 
+// ─── Customer / Loyalty ────────────────────────────────────
+export type LoyaltyTier = 'new' | 'bronze' | 'silver' | 'gold' | 'platinum'
+
+export interface Customer {
+  _id: string
+  salonId: string
+  customerName: string
+  customerPhone: string
+  totalVisits: number
+  loyaltyPoints: number
+  loyaltyTier: LoyaltyTier
+  firstVisitDate: string | null
+  lastVisitDate: string | null
+  notes: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CustomerStats {
+  total: number
+  tiers: Record<LoyaltyTier, number>
+}
+
+export interface UpdateCustomerData {
+  customerName?: string
+  notes?: string
+}
+
 export interface ErrorResponse {
   message: string | string[]
   error: string
@@ -205,6 +233,53 @@ class ApiClient {
       headers: this.getHeaders(),
     })
     return this.handleResponse<DeleteResponse>(response)
+  }
+
+  // ─── Customer / Loyalty APIs ────────────────────────────────
+
+  async getCustomers(search?: string, tier?: string): Promise<Customer[]> {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (tier) params.set('tier', tier)
+    const qs = params.toString()
+    const response = await fetch(`${API_BASE}/customers${qs ? `?${qs}` : ''}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<Customer[]>(response)
+  }
+
+  async getCustomerStats(): Promise<CustomerStats> {
+    const response = await fetch(`${API_BASE}/customers/stats`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<CustomerStats>(response)
+  }
+
+  async getCustomerById(customerId: string): Promise<Customer> {
+    const response = await fetch(`${API_BASE}/customers/${customerId}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<Customer>(response)
+  }
+
+  async getCustomerByPhone(phone: string): Promise<Customer | null> {
+    const response = await fetch(`${API_BASE}/customers/phone/${encodeURIComponent(phone)}`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<Customer | null>(response)
+  }
+
+  async updateCustomer(customerId: string, data: UpdateCustomerData): Promise<Customer> {
+    const response = await fetch(`${API_BASE}/customers/${customerId}`, {
+      method: 'PATCH',
+      headers: this.getHeaders(),
+      body: JSON.stringify(data),
+    })
+    return this.handleResponse<Customer>(response)
   }
 }
 

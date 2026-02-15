@@ -5,7 +5,7 @@ import { useAuth } from '@/lib/auth-context'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import Link from 'next/link'
-import { Calendar, Settings, LogOut, Home } from 'lucide-react'
+import { Calendar, Settings, LogOut, Home, Users } from 'lucide-react'
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -20,6 +20,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const navItems = [
     { href: '/dashboard', label: 'Dashboard', icon: Home },
     { href: '/bookings', label: 'All Bookings', icon: Calendar },
+    { href: '/customers', label: 'Customers', icon: Users },
     { href: '/settings', label: 'Settings', icon: Settings },
   ]
 
