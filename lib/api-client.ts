@@ -281,6 +281,41 @@ class ApiClient {
     })
     return this.handleResponse<Customer>(response)
   }
+
+  // ─── Upload (Cloudinary) ───────────────────────────────────────
+
+  async uploadImage(file: File): Promise<{ url: string }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    const token = this.getToken()
+    const headers: HeadersInit = {}
+    if (token) headers.Authorization = `Bearer ${token}`
+    const response = await fetch(`${API_BASE}/upload`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    })
+    return this.handleResponse<{ url: string }>(response)
+  }
+
+  // ─── Content / Website config ────────────────────────────────
+
+  async getContent(): Promise<Record<string, unknown>> {
+    const response = await fetch(`${API_BASE}/content`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    })
+    return this.handleResponse<Record<string, unknown>>(response)
+  }
+
+  async updateContent(content: Record<string, unknown>): Promise<{ success: true }> {
+    const response = await fetch(`${API_BASE}/content`, {
+      method: 'PUT',
+      headers: this.getHeaders(),
+      body: JSON.stringify(content),
+    })
+    return this.handleResponse<{ success: true }>(response)
+  }
 }
 
 export const apiClient = new ApiClient()
