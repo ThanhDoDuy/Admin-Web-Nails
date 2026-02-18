@@ -1,12 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { ProtectedRoute } from '@/components/protected-route'
 import { DashboardLayout } from '@/components/dashboard-layout'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { BookingFormDialog } from '@/components/booking-form-dialog'
 import { DeleteBookingDialog } from '@/components/delete-booking-dialog'
@@ -14,7 +21,18 @@ import { LoyaltyBadge } from '@/components/loyalty-badge'
 import { apiClient, type Booking, type Customer, type CreateBookingData, type ErrorResponse } from '@/lib/api-client'
 import { format } from 'date-fns'
 import { ViewBookingDialog } from '@/components/view-booking-dialog'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 import { Search, AlertCircle, ChevronUp, ChevronDown, Plus, Eye, Pencil, Trash2 } from 'lucide-react'
+
+const PAGE_SIZE = 10
 
 type SortField = 'date' | 'name' | 'status'
 type SortOrder = 'asc' | 'desc'
@@ -26,8 +44,11 @@ export default function BookingsPage() {
   const [error, setError] = useState<ErrorResponse | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [filterMonth, setFilterMonth] = useState<string>('') // YYYY-MM
+  const [filterDate, setFilterDate] = useState<string>('') // YYYY-MM-DD
   const [sortField, setSortField] = useState<SortField>('date')
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
+  const [page, setPage] = useState(1)
 
   // Dialog states
   const [formDialogOpen, setFormDialogOpen] = useState(false)
@@ -47,7 +68,12 @@ export default function BookingsPage() {
 
   useEffect(() => {
     filterAndSortBookings()
-  }, [bookings, searchTerm, statusFilter, sortField, sortOrder])
+  }, [bookings, searchTerm, statusFilter, filterMonth, filterDate, sortField, sortOrder])
+
+  // Reset to page 1 when filters/sort change
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, statusFilter, filterMonth, filterDate, sortField, sortOrder])
 
   const fetchAllBookings = async () => {
     setIsLoading(true)
@@ -91,6 +117,13 @@ export default function BookingsPage() {
     // Filter by status
     if (statusFilter !== 'all') {
       filtered = filtered.filter(b => b.status === statusFilter)
+    }
+
+    // Filter by date (exact day takes precedence)
+    if (filterDate) {
+      filtered = filtered.filter(b => b.bookingDate === filterDate)
+    } else if (filterMonth) {
+      filtered = filtered.filter(b => b.bookingDate.startsWith(filterMonth))
     }
 
     // Sort
@@ -166,6 +199,12 @@ export default function BookingsPage() {
     setViewDialogOpen(true)
   }
 
+  const totalFiltered = filteredBookings.length
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / PAGE_SIZE))
+  const start = (page - 1) * PAGE_SIZE
+  const end = Math.min(start + PAGE_SIZE, totalFiltered)
+  const paginatedBookings = filteredBookings.slice(start, end)
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'confirmed':
@@ -231,7 +270,7 @@ export default function BookingsPage() {
 
           {/* Filters */}
           <Card className="border-border">
-            <CardContent className="pt-6">
+            <CardContent className="pt-6 space-y-4">
               <div className="flex flex-col md:flex-row gap-4">
                 <div className="flex-1">
                   <div className="relative">
@@ -262,6 +301,67 @@ export default function BookingsPage() {
                   ))}
                 </div>
               </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground whitespace-nowrap">
+                    Month
+                  </span>
+                  <Select
+                    value={filterMonth ? filterMonth.slice(0, 7) : 'all'}
+                    onValueChange={(val) => setFilterMonth(val === 'all' ? '' : val)}
+                  >
+                    <SelectTrigger className="w-[140px] border-border focus:ring-[#E8CFCF]">
+                      <SelectValue placeholder="All" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      {(() => {
+                        const now = new Date()
+                        const items: { value: string; label: string }[] = []
+                        for (let i = -6; i <= 6; i++) {
+                          const d = new Date(now.getFullYear(), now.getMonth() + i, 1)
+                          const y = d.getFullYear()
+                          const m = String(d.getMonth() + 1).padStart(2, '0')
+                          items.push({
+                            value: `${y}-${m}`,
+                            label: format(d, 'MMM yyyy'),
+                          })
+                        }
+                        return items.map(({ value, label }) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))
+                      })()}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <label htmlFor="filter-date" className="text-sm text-muted-foreground whitespace-nowrap">
+                    Date
+                  </label>
+                  <Input
+                    id="filter-date"
+                    type="date"
+                    value={filterDate}
+                    onChange={(e) => setFilterDate(e.target.value)}
+                    className="w-[150px] border-border focus-visible:ring-[#E8CFCF]"
+                  />
+                </div>
+                {(filterMonth || filterDate) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setFilterMonth('')
+                      setFilterDate('')
+                    }}
+                    className="text-muted-foreground hover:text-foreground"
+                  >
+                    Clear date filter
+                  </Button>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -272,7 +372,9 @@ export default function BookingsPage() {
                 <div>
                   <CardTitle>Bookings List</CardTitle>
                   <CardDescription>
-                    {isLoading ? 'Loading...' : `${filteredBookings.length} bookings`}
+                    {isLoading
+                      ? 'Loading...'
+                      : `Showing ${totalFiltered === 0 ? 0 : start + 1}–${end} of ${totalFiltered} bookings`}
                   </CardDescription>
                 </div>
                 <Button
@@ -293,26 +395,27 @@ export default function BookingsPage() {
               ) : filteredBookings.length === 0 ? (
                 <p className="text-center py-8 text-muted-foreground">No bookings found</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-3 px-4 font-semibold text-foreground">
-                          <SortButton field="name" label="Customer" />
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold text-foreground">Service</th>
-                        <th className="text-left py-3 px-4 font-semibold text-foreground">
-                          <SortButton field="date" label="Date & Time" />
-                        </th>
-                        <th className="text-left py-3 px-4 font-semibold text-foreground">Phone</th>
-                        <th className="text-left py-3 px-4 font-semibold text-foreground">
-                          <SortButton field="status" label="Status" />
-                        </th>
-                        <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredBookings.map(booking => (
+                <>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-border">
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">
+                            <SortButton field="name" label="Customer" />
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Service</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">
+                            <SortButton field="date" label="Date & Time" />
+                          </th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">Phone</th>
+                          <th className="text-left py-3 px-4 font-semibold text-foreground">
+                            <SortButton field="status" label="Status" />
+                          </th>
+                          <th className="text-right py-3 px-4 font-semibold text-foreground">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {paginatedBookings.map(booking => (
                         <tr
                           key={booking._id}
                           className="border-b border-border/50 hover:bg-secondary/30 transition"
@@ -386,10 +489,80 @@ export default function BookingsPage() {
                             </div>
                           </td>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {totalPages > 1 && (
+                    <div className="flex items-center justify-between border-t border-border pt-4 mt-4">
+                      <p className="text-sm text-muted-foreground whitespace-nowrap">
+                        Page {page} of {totalPages}
+                      </p>
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                setPage((p) => Math.max(1, p - 1))
+                              }}
+                              className={
+                                page <= 1
+                                  ? 'pointer-events-none opacity-50'
+                                  : 'cursor-pointer'
+                              }
+                            />
+                          </PaginationItem>
+                          {Array.from({ length: totalPages }, (_, i) => i + 1)
+                            .filter((n) => {
+                              if (totalPages <= 7) return true
+                              if (n === 1 || n === totalPages) return true
+                              if (Math.abs(n - page) <= 1) return true
+                              return false
+                            })
+                            .map((n, idx, arr) => (
+                              <Fragment key={n}>
+                                {idx > 0 && arr[idx - 1] !== n - 1 && (
+                                  <PaginationItem>
+                                    <PaginationEllipsis />
+                                  </PaginationItem>
+                                )}
+                                <PaginationItem>
+                                  <PaginationLink
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      setPage(n)
+                                    }}
+                                    isActive={page === n}
+                                    className="cursor-pointer"
+                                  >
+                                    {n}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              </Fragment>
+                            ))}
+                          <PaginationItem>
+                            <PaginationNext
+                              href="#"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                setPage((p) => Math.min(totalPages, p + 1))
+                              }}
+                              className={
+                                page >= totalPages
+                                  ? 'pointer-events-none opacity-50'
+                                  : 'cursor-pointer'
+                              }
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
+                </>
               )}
             </CardContent>
           </Card>
